@@ -1,0 +1,147 @@
+THESE ARE THE REQUIREMENTS:'
+
+We are building a business-focused AI chatbot that serves as a pre-sales and business assistant. When a user starts a conversation, the chatbot clearly presents key options such as 
+generating a free AI pitch, exploring AI bots for business, booking a discovery session, purchasing a book, or requesting research and analysis. Based on the selected option, the bot 
+follows a structured conversation flow to explain the offering, ask relevant questions, and securely store the full interaction. As conversations progress, the system extracts and 
+summarizes key business details, assigns lead scores, and stores these summaries in a dedicated database. An internal Q&A bot can then query 
+these stored summaries to quickly answer questions about individual users or analyze daily trends, enabling teams and leadership to access actionable insights without reviewing 
+raw chat logs.
+
+And the ChatBot should answer from the provided knowledge base only and shoul not Halucinate the user for its irrelevant questions.
+
+'BELOW GIVEN IS THE TECHSTACK WHICH I GOT FROM OTHER RESOURCES:'
+
+This is a detailed, technical workflow specification based on your design. This blueprint connects the frontend user experience with the backend logic and database operations, 
+integrating the safety mechanisms and background intelligence you defined.
+
+Phase 1: The Live Interaction Loop (Synchronous)
+This phase happens in real-time (milliseconds) while the user is waiting for a reply.
+  
+Step 1: Ingestion & Identification
+Action: User sends a text message via the UI.
+
+Component: FastAPI Endpoint (POST /chat).
+Logic:
+Session Management: The system checks headers for a session_id. If none exists, a new UUID is generated.
+User Context: It retrieves the user_profile from Redis or MongoDB. If the profile contains a flag like user_type="technical", the system adjusts tone settings for later steps.
+Logging: The raw incoming message is immediately written to the chat_logs collection in MongoDB with a timestamp.
+
+Step 2: Intent & Option Detection (The Router)
+Action: Determine what the user is trying to do before answering.
+
+Component: Classification Service (Lightweight LLM or Semantic Router).
+
+Logic:
+Keyword/Regex Check: Quick check for exact matches (e.g., "Menu", "Restart").
+Semantic Classification: If no keyword match, a small model (e.g., GPT-3.5-Turbo or a fine-tuned BERT model) classifies the intent into one of your 5 Fixed Flows:
+AI_PITCH
+BOT_EXPLORATION
+DISCOVERY_BOOKING
+BOOK_PURCHASE
+RESEARCH_ANALYSIS
+Fallback/Chit-Chat: If the intent score is low or matches "Greeting", it routes to a generic polite handler, bypassing the heavy RAG lookup to save resources.
+
+Step 3: Knowledge Base Retrieval (The Anti-Hallucination Guardrail)
+Action: Fetch strictly relevant facts; block the answer if none exist.
+
+Component: Vector Database (Pinecone/pgvector).
+Logic:
+
+Query Transformation: The user's query is converted into a vector embedding.
+Scoped Search: The search is filtered by the Selected Flow (e.g., if flow is BOOK_PURCHASE, search only the book_metadata namespace).
+The "Kill Switch": The system checks the Similarity Score of the retrieved chunks.
+Threshold Rule: If the top result has a similarity score < 0.75 (arbitrary threshold), the system halts.
+Output: It returns a pre-canned response: "I don't have information on that topic in my current database."
+
+Step 4: Structured LLM Response Generation
+Action: Generate the user-facing answer using only the retrieved chunks.
+
+Component: Large Language Model (e.g., GPT-4o).
+
+Logic:
+
+System Prompt Assembly:
+"You are a business assistant. Use ONLY the Context provided below. If the answer is not in the context, say you don't know. Current Flow: [Flow Name]. 
+Previous User Answers: [Context Variables]."
+Context Injection: Insert the text chunks retrieved in Step 3.
+Constraint: The model is instructed to end with a specific call-to-action or the next required question for the flow (e.g., "What is your budget?").
+
+Step 5: Conversation Logging & State Update
+Action: Save the turn and update progress.
+
+Component: MongoDB sessions collection.
+
+Logic:
+
+Append: The AI's response is appended to chat_logs.
+
+State Update: The sessions document is updated:
+current_step: (e.g., "asking_budget")
+completion_percentage: (e.g., "40%")
+last_active: Timestamp.
+
+Phase 2: The Intelligence Loop (Asynchronous)
+This phase happens in the background (seconds to minutes) and does not block the user.
+
+Step 6: Real-Time Extraction
+Action: Extract structured data from unstructured text.
+
+Component: Background Worker (Celery / RabbitMQ).
+
+Logic:
+
+Trigger: After every 3 user turns or when a specific milestone is reached.
+Extraction: A separate LLM call processes the last few messages to extract specific fields:
+User Goal -> "Automate customer support"
+Budget -> "$5k - $10k"
+Urgency -> "High"
+Storage: These are saved into a structured SQL table or a specific metadata field in the User Profile, making them queryable.
+
+Step 7: Auto Summary & Lead Scoring
+Action: Finalize the session data for business use.
+
+Component: Scheduled Cron Job or "Session End" Event.
+
+Logic:
+
+Summarization: The LLM reads the full chat_log and produces a 5-bullet executive summary.
+Scoring Algorithm:
+
+Base Score: 0
++10 if Budget is defined.
++20 if "Decision Maker" title is detected.
++30 if they clicked "Book Discovery".
+-10 if they only asked about free tiers.
+Output: A new row is inserted into the daily_summaries database table.
+
+Phase 3: The Consumption Loop (Internal Tools)
+This phase is for your team to consume the data generated above.
+
+Step 8: Internal Q&A Bot
+Action: Allow leadership to query business intelligence.
+
+Component: Internal Dashboard / Slack Bot.
+
+Logic:
+
+Query Routing: When a manager asks "How many high-budget leads today?", the bot generates a SQL query against the daily_summaries table.
+Safety: It is hard-coded to ignore the raw chat_logs collection to prevent reading noise. It only reads the "Clean" data.
+
+Step 9: Human Handoff (The Alert System)
+Action: Notify sales/support when a VIP leads appears.
+
+Component: Notification Service (Webhook to Slack/Email/CRM).
+
+Logic:
+
+Threshold Check: If Lead Score > 75.
+
+Payload: Construct a message containing:
+User Name & Company.
+The AI-generated Summary (from Step 7).
+
+The Calculated Score.
+Push: Send to the #sales-leads Slack channel or create a ticket in HubSpot/Salesforce.
+
+
+"Maam if possible can you please mail me the solution or your response on 23123074@pvgcoet.ac.in"
