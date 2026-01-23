@@ -1,0 +1,61 @@
+THESE ARE THE REQUIREMENTS:'
+
+We are building a business-focused AI chatbot that serves as a pre-sales and business assistant. When a user starts a conversation, the chatbot clearly presents key options such as 
+generating a free AI pitch, exploring AI bots for business, booking a discovery session, purchasing a book, or requesting research and analysis. Based on the selected option, the bot 
+follows a structured conversation flow to explain the offering, ask relevant questions, and securely store the full interaction. As conversations progress, the system extracts and 
+summarizes key business details, assigns lead scores, and stores these summaries in a dedicated database. An internal Q&A bot can then query 
+these stored summaries to quickly answer questions about individual users or analyze daily trends, enabling teams and leadership to access actionable insights without reviewing 
+raw chat logs.
+
+And the ChatBot should answer from the provided knowledge base only and shoul not Halucinate the user for its irrelevant questions.
+
+Given Below is the Tech Stack:
+Phase 1: The Safe Conversation (WhatsApp Interface)
+
+1. User Interface (The Chat Channel)
+
+Tech: WhatsApp Business API.
+Provider: Twilio (Recommended for ease of use) or Meta Cloud API (Cheaper, but slightly more complex setup).
+Why: You cannot connect directly to WhatsApp consumer apps. You need an API provider to send/receive messages programmatically.
+UI Elements: instead of HTML buttons, you will use WhatsApp Interactive Messages (List Messages for your Main Menu, Buttons for Yes/No).
+
+2. Backend Webhook (The Listener)
+
+Tech: FastAPI (Python).
+Role: This acts as a "Webhook Receiver." When a user messages your WhatsApp number, Twilio/Meta sends a POST request to your FastAPI server (/whatsapp-webhook).
+Logic: It parses the JSON payload to get the From number (User ID) and Body (Message text).
+
+3. Intent Detection & Routing
+
+Tech: Semantic Router (Python).
+Why: Still the same. It decides if the user wants the "Pitch Deck" or "Book Purchase" flow.
+
+4. Knowledge Base (Vector Storage)
+
+Tech: Pinecone or Qdrant.
+Why: Stores your business documents to prevent hallucinations.
+
+5. LLM Response Generation
+
+Tech: GPT-4o or Claude 3.5 Sonnet.
+Why: Generates the text that gets sent back to the user's WhatsApp.
+
+Phase 2: The Smart Processing (Background)
+
+6. Database (Logs & Context)
+
+Tech: MongoDB.
+Key Change: Your session_id is now the user's Phone Number.
+Why: MongoDB stores the conversation history associated with that phone number so the bot remembers context (e.g., "Oh, this is the same person from yesterday").
+
+7. Background Workers (Extraction)
+
+Tech: Celery + Redis.
+Why: Processes the WhatsApp chat history in the background to extract leads without slowing down the chat.
+
+Phase 3: The Business Value (Internal)
+
+8. Internal Dashboard
+
+Tech: Streamlit.
+Why: Your team still needs a web dashboard to see the analytics. You won't view charts inside WhatsApp; you will view them on a secure internal webpage powered by your PostgreSQL data.
